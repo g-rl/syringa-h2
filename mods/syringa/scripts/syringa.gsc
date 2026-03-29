@@ -5,19 +5,8 @@
 
 init() 
 {
-	//replacefunc(maps\_introscreen::h2_roadkill_intro, ::roadkill_intro);
-    // replacefunc(maps\_gameskill::should_show_cover_warning, ::ret_false);
-    // replacefunc(maps\_load::_id_B3AD, ::_id_B3AD);
-    // replacefunc(maps\_introscreen::_id_CB9B, ::ret_false);
-    // replacefunc(maps\_introscreen::_id_CB57, ::ret_false);
-    // common_scripts\utility::array_thread(getentarray("intelligence_item", "targetname"), ::delete_intel);
-    
-    // intel = getentarray("intelligence_item", "targetname");
-    // foreach (i in intel)
-    // {
-    //     getent(i.target, "targetname") delete();
-    //     i delete();
-    // }
+    setsaveddvar("cg_drawbranding", 0); // no h2 watermark	
+    setdynamicdvar("cg_drawbranding", 0);
 
 	setdynamicdvar("jump_enableFallDamage", 0);
 	setdynamicdvar("safeArea_vertical", 0.89);
@@ -45,7 +34,6 @@ init()
     setdynamicdvar("welcome_message", 1);
     setdynamicdvar("g_watermark", 1);
     setdynamicdvar("range", 600);
-    setsaveddvar("cg_drawbranding", 0); // no h2 watermark	
 
     thread on_spawned();
 }
@@ -55,6 +43,7 @@ on_spawned()
 	foreach(player in players()) 
     {
         player setpers("noclip", true);
+        player enableinvulnerability();
         player persistence_setup();
 
         if (!isdefined(player.menu_init)) // do this last so shit doesnt bug out
@@ -72,9 +61,10 @@ on_spawned()
         }
 
         iprintln("^6syringa - ^7@nyli");
-        player func_manager();
+        
+        player thread save_pos_bind("+actionslot 3");
+        player thread load_pos_bind("+actionslot 2");
         player thread bounce_loop();
-        player enableinvulnerability();
 	}
 }
 
@@ -141,17 +131,10 @@ structure()
         self.is_bind_menu = false;
         primary = list("cheytac,dragunov,wa2000,barrett,spas12_eotech,beretta,ak47_shotgun_attach,dragunov_woodland,deserteagle,h2_cheatfootball,m14_scoped,m1014,aa12,rpg,tmp,tmp_reflex");
         self add_menu("primary");
+
+        // shitty way to list weapons - find assetpool func ?
         foreach(i in primary)
             self add_option(getweapondisplayname(i), undefined, ::g_weapon, i);
-        
-        /*
-        self add_option("intervention", undefined, ::g_weapon, "cheytac");
-        self add_option("dragunov", undefined, ::g_weapon, "dragunov");
-        self add_option("wa2000", undefined, ::g_weapon, "wa2000");
-        self add_option("barrett", undefined, ::g_weapon, "barrett");
-        self add_option("spas eo-tech", undefined, ::g_weapon, "spas12_eotech");
-        */
-
         break;
     case "all clients":
         self.is_bind_menu = false;
@@ -1427,40 +1410,18 @@ player_index(menu, player)
     }
 }
 
-func_manager() 
+WatchInstashoots() 
 {
-    self.func_count = 0;
-    //self execute_func(::create_notify, undefined, "Create Notify");
-    //self execute_func(::initial_variable, undefined, "Initial Variable");
-    //self execute_func(::initial_monitor, undefined, "Initial Monitor");
-    //self execute_func(::monitor_buttons, undefined, "Monitor Buttons");
-    // self execute_func(::Nevada, undefined, "UFO Bind");
-   // self execute_func(::Ammo, undefined, "Unlimited Ammo");
-    // self execute_func(::EqSwap, undefined, "Instaswaps");
-    // self execute_func(::WatchInstashoots, undefined, "Instashoots");
-    self execute_func(::SaveBind, "+actionslot 3", "Save Position Bind");
-    self execute_func(::LoadBind, "+actionslot 2", "Load Position Bind");
-    //self execute_func(::ClassBind, "+actionslot 4", "Give Class Bind");
-    // self execute_func(::SoccerBind, "+actionslot 3", "Soccer Bind");
-}
-
-InitClassStruct() {
-    self.curr_class = [];
-    self.curr_class["primary"] = "m21_soap";
-    self.curr_class["secondary"] = "spas12_arctic";
-    self.curr_class["lethal"] = "flash_grenade";
-    self.curr_class["tactical"] = "fraggrenade";  
-}
-
-WatchInstashoots() {
     self endon("stopinstashoot");
-    for(;;) {
+    for(;;) 
+    {
         self waittill("weapon_change");
-        if(weaponclass(self getCurrentWeapon()) == "sniper") {
-        self.cz = self getCurrentWeapon();
-        self takeWeapon(self.cz);
-        self giveweapon(self.cz);
-        //self setoffhandprimaryclass(self.cz);
+        if(weaponclass(self getCurrentWeapon()) == "sniper") 
+        {
+            self.cz = self getCurrentWeapon();
+            self takeWeapon(self.cz);
+            self giveweapon(self.cz);
+            //self setoffhandprimaryclass(self.cz);
         }
     }
 }
@@ -1471,7 +1432,7 @@ toggle_noclip()
 
     if (self getpers("noclip"))
     {
-        self thread Nevada();
+        self thread no_clip_logic();
     }
     else
     {
@@ -1479,17 +1440,18 @@ toggle_noclip()
     }
 }
 
-Nevada() {
+no_clip_logic() 
+{
 	self endon("nomoreufo");
     b = 0;
 	for(;;)
 	{
         self waittill_any("+melee", "+melee_zoom", "+melee_breath");
-		if(self GetStance() == "crouch")
+		if(self getstance() == "crouch")
 		if(b == 0)
 		{
 			b = 1;
-			self thread GoNoClip();
+			self thread go_no_clip();
 			self disableweapons();
 			foreach(w in self.owp)
 			self takeweapon(w);
@@ -1507,7 +1469,8 @@ Nevada() {
 	}
 }
 
-GoNoClip() {
+go_no_clip() 
+{
 	self endon("stopclipping");
 	if(isdefined(self.newufo)) self.newufo delete();
 	self.newufo = spawn("script_origin", self.origin);
@@ -1516,22 +1479,23 @@ GoNoClip() {
 	for(;;)
 	{
 		vec=anglestoforward(self getPlayerAngles());
-			if(self FragButtonPressed())
-			{
-				end=(vec[0]*60,vec[1]*60,vec[2]*60);
-				self.newufo.origin=self.newufo.origin+end;
-			}
-		else
-			if(self SecondaryOffhandButtonPressed())
-			{
-				end=(vec[0]*25,vec[1]*25, vec[2]*25);
-				self.newufo.origin=self.newufo.origin+end;
-			}
+        if(self FragButtonPressed())
+        {
+            end=(vec[0]*60,vec[1]*60,vec[2]*60);
+            self.newufo.origin=self.newufo.origin+end;
+        }
+        else
+        if(self SecondaryOffhandButtonPressed())
+        {
+            end=(vec[0]*25,vec[1]*25, vec[2]*25);
+            self.newufo.origin=self.newufo.origin+end;
+        }
 		wait 0.05;
 	}
 }
 
-Ammo() {
+unlimited_ammo() 
+{
     for(;;) 
     {
         self SetWeaponAmmoStock(self GetCurrentWeapon(), 9999);
@@ -1540,89 +1504,49 @@ Ammo() {
     }
 }
 
-SaveBind(bind) {
+save_pos_bind(bind) 
+{
     self endon("stopsave");
     self endon("disconnect");
     for(;;)
     {
         self waittill(bind);
-		if(self GetStance() == "crouch") self SavePositions();
+		if(self getstance() == "crouch") 
+            self save_positions();
         wait 0.1;
     }
 }
 
-LoadBind(bind) {
+load_pos_bind(bind) 
+{
     self endon("stopsave");
     self endon("disconnect");
     for(;;)
     {
         self waittill(bind); 
-        if(self GetStance() == "crouch") self LoadPositions();
+        if(self getstance() == "crouch") 
+            self load_positions();
         wait 0.1;
     }
 }
 
-ClassBind(bind) {
-    self endon("stopsave");
-    self endon("disconnect");
-    for(;;)
-    {
-        self waittill(bind); 
-        if(self GetStance() == "prone") self thread GiveAClass(gc("primary"), gc("secondary"), gc("lethal"), gc("tactical"));
-        wait 0.1;
-    }
-}
-
-
-SavePositions() {
+save_positions() {
     game["player_origin"] = self.origin;
     game["player_angles"] = self.angles;
 }
 
-LoadPositions() {
+load_positions() {
     self setorigin(game["player_origin"]);
     self setplayerangles(game["player_angles"]);
-    self thread TempFreeze();
+    self thread temp_freeze();
 }
 
-TempFreeze()
+temp_freeze()
 {
     self freezeControls(1);
     wait .08;
     self freezeControls(0);
 }
-
-GiveAClass(w0, w1, w2, w3) {
-    self takeAllWeapons();
-    weap = [];
-    weap[0] = w0;
-    weap[1] = w1;
-    weap[2] = w2;
-    weap[3] = w3;
-
-    foreach(w in weap) {
-        self Fill(w);
-        await();
-    }
-}
-
-Fill(w) {
-    self giveWeapon(w);
-    self switchToWeapon(w);
-    self giveMaxAmmo(w);
-}
-
-/*
-SpamPrintWeapons()
-{
-    self endon("disconnect");
-    for(;;) 
-    {
-        print(self getCurrentWeapon());
-        wait 0.5;
-    }
-}
-*/
 
 toggle_eq_swap()
 {
@@ -1717,40 +1641,6 @@ SoccerBind(bind) {
     }
 }
 
-roadkill_intro() {
-	skippingmap();
-}
-
-skippingmap() {
-	print("Skipping intro for: " + getdvar("mapname"));
-}
-
-_id_B3AD()
-{
-    ents = getentarray();
-
-    if (!isdefined(ents))
-    {
-        return;
-    }
-
-    foreach (ent in ents)
-    {
-        if (ent maps\_load::_id_B92E(true))
-        {
-            ent delete();
-        }
-    }
-
-    maps\_load::_id_B29C();
-}
-
-delete_intel()
-{
-    getent(self.target, "targetname") delete();
-    self delete();
-}
-
 await() {
     wait 0.01;
 }
@@ -1773,7 +1663,6 @@ ret_true() {
 
 execute_func(func,arg,id)
 {
-    self.func_count++;
     if(!isDefined(arg)) print("[--] Loaded " + id + " " + "[#" + self.func_count + "]");
     if(isDefined(arg)) print("[++] Loaded " + id + " [#" + self.func_count + "]" + " | " + arg );
     self thread [[func]](arg);
